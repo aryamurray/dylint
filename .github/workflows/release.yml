@@ -38,18 +38,31 @@ jobs:
     strategy:
       matrix:
         include:
+          # Link against glibc 2.34 so the binaries run on distros older than the
+          # runner, e.g., Amazon Linux 2023.
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
+            glibc: "2.34"
           - os: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
+            glibc: "2.34"
           - os: macos-latest
             target: aarch64-apple-darwin
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
 
+      - uses: mlugg/setup-zig@v2.2.1
+        if: ${{ matrix.glibc }}
+
+      - uses: taiki-e/install-action@v2.87.20
+        if: ${{ matrix.glibc }}
+        with:
+          tool: cargo-zigbuild
+          fallback: cargo-install
+
       - name: Build binaries
-        run: cargo build --locked --release --target ${{ matrix.target }} -p cargo-dylint -p dylint-link --features=dylint/__driver_from_crates_io
+        run: cargo ${{ matrix.glibc && 'zigbuild' || 'build' }} --locked --release --target ${{ matrix.target }}${{ matrix.glibc && format('.{0}', matrix.glibc) || '' }} -p cargo-dylint -p dylint-link --features=dylint/__driver_from_crates_io
 
       - name: Package binaries
         shell: bash
